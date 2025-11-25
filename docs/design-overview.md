@@ -136,7 +136,48 @@ for Mermaid source and any exported PNGs/SVGs.
 
 ---
 
-## 7. Next Steps
+### 3.7 Optional Future Enhancement: Target List Generator
+
+The SeaBASS team identified an important related use case that is adjacent to the
+Universal Find Matchups service: the automated creation of **target lists** from
+user-provided files. A target list is a standardized set of (timestamp,
+latitude, longitude) pairs that serve as input to the Find Matchups service.
+
+Currently, OB.DAAC users often derive these target lists from metadata contained
+in SeaBASS (.sb) files, but other users may want to generate matchup targets
+from CSV, Excel, or netCDF files. To support these use cases, a future optional
+enhancement could be a **Target List Generator** that:
+
+- Accepts one or more input files:
+  - SeaBASS `.sb` files  
+  - CSV/Excel tables  
+  - netCDF datasets  
+  - Other formats as needed  
+
+- Extracts the relevant metadata fields:
+  - Timestamp  
+  - Latitude  
+  - Longitude  
+
+- Produces a standardized target-list structure suitable for the Universal Find
+  Matchups API.
+
+This proposed functionality is **deliberately separate** from the core Find
+Matchups service. The Universal Find Matchups service should remain simple and
+collection-agnostic, requiring the target list as input rather than generating
+it. The Target List Generator should be considered a **future standalone
+preprocessing tool**, which could be implemented either:
+
+- as a dedicated Harmony service,  
+- as a client-side utility,  
+- or as a modular component feeding the Find Matchups workflow.
+
+Separating this preprocessing step from the core Find Matchups capability keeps
+the initial implementation simple and universal while still acknowledging the
+long-term value of automated target-list creation for SeaBASS and other
+data-driven workflows.
+
+## 8. Next Steps
 
 - Complete description of the current OB.DAAC matchup logic
 - Fill in the component mapping table
