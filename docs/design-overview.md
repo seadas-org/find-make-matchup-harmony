@@ -37,26 +37,77 @@ As this document evolves, it should capture both **current behavior** and the
 
 ## 2. Existing OB.DAAC Matchup Logic (Summary)
 
-> To be filled in as you review `fd_matchup.py` and related tools.
+The current “Find and Make Matchup” capability at OB.DAAC is implemented through
+the Python module `fd_matchup.py`. It performs pixel-level collocation between a
+primary dataset and one or more secondary datasets (e.g., satellite-to-satellite
+or satellite-to-in situ).
 
-Suggested content:
+### 2.1 Inputs
 
-- **Inputs**
-  - Primary collection and granules
-  - Secondary collection(s) and search parameters
-  - Time and space tolerances
-  - Angle / geometry constraints (if applicable)
-  - Quality flags / filtering options
+Typical inputs include:
 
-- **Processing steps**
-  - How primary and secondary granules are discovered
-  - How spatial and temporal matching is performed
-  - Any interpolation or aggregation logic
+- Primary granule(s)  
+- Secondary collection(s)  
+- Time window (e.g., ±3 hours)  
+- Spatial distance tolerance (pixel-to-pixel)  
+- Pixel selection options  
+- Optional geometry constraints (solar/viewing zenith, relative azimuth)  
+- Quality filters (L2 flags, cloud masking)  
+- Output format (CSV/ASCII)
 
-- **Outputs**
-  - File format (CSV, ASCII, NetCDF, etc.)
-  - Variable/content structure (columns, groups, metadata)
-  - How outputs are currently consumed (SeaDAS, downstream tools)
+### 2.2 Granule Discovery and Preparation
+
+1. Parse metadata for the primary granule (time, footprint).  
+2. Identify candidate secondary granules based on:
+   - Time window  
+   - Potential spatial overlap  
+
+This may use CMR-like metadata queries or internal OB.DAAC indexing.
+
+### 2.3 Temporal Filtering
+
+For each secondary granule:
+- Compute time difference with the primary
+- Keep only granules within the user-specified Δt window
+
+### 2.4 Spatial Filtering
+
+For each remaining secondary granule:
+- Load geolocation arrays  
+- Perform coarse overlap filtering (bounding box or swath intersection)  
+- Optionally refine with pixel-level distance checks  
+
+### 2.5 Pixel-Level Matchup Computation
+
+For each primary pixel:
+
+- Find nearest valid pixel(s) in secondary dataset within distance tolerance  
+- Compute:
+  - Temporal difference  
+  - Spatial separation  
+  - Validity of angular constraints  
+
+If all conditions pass, a matchup record is created.
+
+### 2.6 Quality Screening
+
+Apply quality masks such as:
+- L2 flags  
+- Cloud screening  
+- Invalid or fill-value masking  
+
+### 2.7 Output Generation
+
+The tool writes a matchup product—typically CSV or ASCII—with fields such as:
+
+- Coordinates of primary and secondary pixels  
+- Δt (time difference)  
+- Δd (distance)  
+- Matched radiometric/reflectance values  
+- Viewing geometry  
+- Additional metadata needed for interpretation  
+
+This output is consumed by downstream tools (e.g., SeaDAS).
 
 ---
 
@@ -236,7 +287,7 @@ data-driven workflows.
 
 ## 4. Mapping to Harmony Components
 
-See [`component-mapping.md`](component-mapping.md) for a detailed table.
+See [`component-mapping.md`](./component-mapping.md) for a detailed table.
 
 At a high level:
 
