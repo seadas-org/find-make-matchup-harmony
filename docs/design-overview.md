@@ -60,81 +60,137 @@ Suggested content:
 
 ---
 
-## 3. Mapping to Harmony Components
+---
 
-See [`component-mapping.md`](component-mapping.md) for a detailed table.
+## 3. Universal “Find Matchups” Service (SeaBASS Lead Request)
 
-At a high level:
+During discussions with the SeaBASS team, a clear and incremental path emerged for
+implementing a Harmony-enabled matchup capability. The recommendation is to begin
+with a **simple, universal, metadata-driven “Find Matchups” service**, before
+progressing to more advanced or pixel-level “Make Matchups” workflows.
 
-- **Granule discovery** → Harmony / CMR search
-- **Subsetting (space/time/variables)** → HOSS
-- **Matchup computation** → New custom Harmony service/container
-- **Output formatting** → Inside the container and/or via existing TRT services
-- **STAC description** → Harmony job output
-
-This section will be expanded once the mapping table is filled in.
+This section summarizes the SeaBASS lead’s request and describes how it aligns
+with Harmony capabilities.
 
 ---
 
-## 4. Proposed Harmony Workflow (High-Level)
+### 3.1 Objective
 
-High-level steps:
+Develop a lightweight Harmony service that:
 
-1. User submits a matchup request to Harmony with:
-   - Primary collection and constraints
-   - Secondary collection(s)
-   - Spatial/temporal window
-   - Matchup options and output preferences
+- Accepts a **list of target points** (geographic coordinates + timestamps)
+- Searches specified **satellite collections** for temporally and spatially
+  coincident granules
+- Returns, for each target point, a structured list of matching granules
 
-2. Harmony:
-   - Performs **Search** for primary granules
-   - Performs **Search** for secondary granules within a time window
-   - Uses **HOSS** to subset primary and secondary data
-   - Sends subsetted data to a **Matchup container**
-
-3. The matchup container:
-   - Performs collocation / matching
-   - Writes the final matchup product (e.g., CSV or NetCDF)
-   - Optionally generates metadata for STAC
-
-4. Harmony:
-   - Registers the outputs as STAC items
-   - Returns links to the user (download URLs + STAC metadata)
-
-A more detailed sequence diagram is provided in `workflow-diagram.md`.
+This service performs **metadata-only** matching (no file downloads, no pixel-
+level extraction) and represents the simplest universal replacement for the
+“find” component of existing OB.DAAC tools such as `fd_matchup.py`.
 
 ---
 
-## 5. Inputs and Outputs
+### 3.2 Inputs
 
-### 5.1. Expected Inputs
+The proposed inputs for the Universal Find Matchups service are:
 
-Examples:
+1. **Target list**  
+   A list of time–location pairs.  
+   Each entry contains:
+   - timestamp  
+   - latitude  
+   - longitude  
 
-- Primary collection ID (e.g., PACE OCI L2)
-- Secondary collection ID(s)
-- Time range or reference granule(s)
-- Spatial constraints (region, track, point list)
-- Matchup tolerances (time, distance, angle)
-- Output format (CSV, NetCDF)
-- Optional filters (quality flags, etc.)
+   Target lists may originate from:
+   - SeaBASS (.sb) files  
+   - Other file formats (CSV, Excel, netCDF, etc.)  
+   - User-constructed lists  
 
-### 5.2. Expected Outputs
+2. **Time tolerance window**  
+   A symmetric ±Δt defining the acceptable temporal separation between the target
+   point and candidate granules.
 
-- Matchup product file(s) (CSV or NetCDF)
-- STAC metadata describing:
-  - Inputs (collections, time range, region)
-  - Processing steps (search, subset, matchup)
-  - Provenance and parameters used
+3. **Collection(s) to query**  
+   One or more OB.DAAC collections (e.g., PACE OCI L2, MODIS-Aqua L2, VIIRS L2).
+
+4. *(Optional)* Additional filtering parameters  
+   For future enhancement, the service may accept optional constraints such as:
+   - platform/instrument selection  
+   - day/night  
+   - data type (e.g., L2 gen vs L2 bin)  
+   - spatial tolerance overrides  
 
 ---
 
-## 6. Diagrams
+### 3.3 Outputs
 
-See [`workflow-diagram.md`](workflow-diagram.md) and the `diagrams/` directory
-for Mermaid source and any exported PNGs/SVGs.
+For each target input point, the service returns:
+
+- The list of **granules** from the specified collection(s) that fall within the
+  temporal tolerance and whose spatial metadata (bounding box or swath polygon)
+  suggests potential overlap.
+
+The output includes collection and granule metadata such as:
+
+- granule ID  
+- collection ID  
+- acquisition start/end time  
+- spatial bounding box / polygon  
+- (optional) URL for accessing granule metadata or download links  
+
+This enables simple downstream usage, including:
+
+- Selecting granules for download  
+- Passing results to more complex “Make Matchup” workflows  
+- Generating matchup candidate lists for SeaBASS, SeaDAS, or user-defined tools  
 
 ---
+
+### 3.4 Implementation Notes (Harmony Perspective)
+
+- The service can be implemented as a lightweight Harmony “Find-only” job:
+  - Harmony forwards the target list and parameters to a container
+  - The container performs CMR/Harmony Search queries
+  - The container applies temporal and spatial filters
+  - Results are returned in JSON/CSV
+
+- No subsetting is required; therefore:
+  - HOSS is not invoked
+  - No L2 files are downloaded
+  - No computation on geolocation arrays is needed
+
+- This aligns well with Harmony’s strengths as a scalable search/aggregation
+  orchestrator.
+
+---
+
+### 3.5 Relationship to Existing OB.DAAC Tools
+
+This Universal Find Matchups service provides a cloud-native, API-accessible
+alternative to the existing OB.DAAC scripts:
+
+- **Replaces the “find” functionality** of `fd_matchup.py`
+- Does **not** perform extraction (i.e., does not replace `mk_matchup.py` /
+  `val_extract`)
+- Enables users to build more complex workflows by supplying a clean set of
+  matched granules
+
+This also supports SeaBASS workflows by enabling automated creation of matchup
+candidate lists from `.sb` files or other formats.
+
+---
+
+### 3.6 Path Forward
+
+This universal “Find-only” capability provides a foundation for:
+
+- Future enhancements to support more complex discovery logic
+- Satellite-to-satellite matchup searches
+- Eventually implementing a full **“Make Matchups”** Harmony service involving
+  subsetting and pixel-level extraction
+
+Starting with a simple and universal “Find Matchups” API is a strategically
+sound and low-risk first step that supports multiple OB.DAAC use cases.
+
 
 ### 3.7 Optional Future Enhancement: Target List Generator
 
@@ -177,6 +233,82 @@ the initial implementation simple and universal while still acknowledging the
 long-term value of automated target-list creation for SeaBASS and other
 data-driven workflows.
 
+
+## 4. Mapping to Harmony Components
+
+See [`component-mapping.md`](component-mapping.md) for a detailed table.
+
+At a high level:
+
+- **Granule discovery** → Harmony / CMR search
+- **Subsetting (space/time/variables)** → HOSS
+- **Matchup computation** → New custom Harmony service/container
+- **Output formatting** → Inside the container and/or via existing TRT services
+- **STAC description** → Harmony job output
+
+This section will be expanded once the mapping table is filled in.
+
+---
+
+## 5. Proposed Harmony Workflow (High-Level)
+
+High-level steps:
+
+1. User submits a matchup request to Harmony with:
+   - Primary collection and constraints
+   - Secondary collection(s)
+   - Spatial/temporal window
+   - Matchup options and output preferences
+
+2. Harmony:
+   - Performs **Search** for primary granules
+   - Performs **Search** for secondary granules within a time window
+   - Uses **HOSS** to subset primary and secondary data
+   - Sends subsetted data to a **Matchup container**
+
+3. The matchup container:
+   - Performs collocation / matching
+   - Writes the final matchup product (e.g., CSV or NetCDF)
+   - Optionally generates metadata for STAC
+
+4. Harmony:
+   - Registers the outputs as STAC items
+   - Returns links to the user (download URLs + STAC metadata)
+
+A more detailed sequence diagram is provided in `workflow-diagram.md`.
+
+---
+
+## 6. Inputs and Outputs
+
+### 6.1. Expected Inputs
+
+Examples:
+
+- Primary collection ID (e.g., PACE OCI L2)
+- Secondary collection ID(s)
+- Time range or reference granule(s)
+- Spatial constraints (region, track, point list)
+- Matchup tolerances (time, distance, angle)
+- Output format (CSV, NetCDF)
+- Optional filters (quality flags, etc.)
+
+### 6.2. Expected Outputs
+
+- Matchup product file(s) (CSV or NetCDF)
+- STAC metadata describing:
+  - Inputs (collections, time range, region)
+  - Processing steps (search, subset, matchup)
+  - Provenance and parameters used
+
+---
+
+## 7. Diagrams
+
+See [`workflow-diagram.md`](workflow-diagram.md) and the `diagrams/` directory
+for Mermaid source and any exported PNGs/SVGs.
+
+---
 ## 8. Next Steps
 
 - Complete description of the current OB.DAAC matchup logic
