@@ -3,7 +3,6 @@
 
 ## 3️⃣ `docs/design-overview.md`
 
-```markdown
 # Design Overview: Find & Make Matchup Harmony Workflow
 
 This document describes the **analysis and design** for a Harmony-based
