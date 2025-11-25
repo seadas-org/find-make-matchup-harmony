@@ -111,8 +111,6 @@ This output is consumed by downstream tools (e.g., SeaDAS).
 
 ---
 
----
-
 ## 3. Universal “Find Matchups” Service (SeaBASS Lead Request)
 
 During discussions with the SeaBASS team, a clear and incremental path emerged for
