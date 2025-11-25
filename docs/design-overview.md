@@ -287,7 +287,7 @@ data-driven workflows.
 
 ## 4. Mapping to Harmony Components
 
-See [`component-mapping.md`](./component-mapping.md) for a detailed table.
+See [`component-mapping.md`](component-mapping.md) for a detailed table.
 
 At a high level:
 
