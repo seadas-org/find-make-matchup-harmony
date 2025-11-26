@@ -23,7 +23,7 @@ It supports the initial design ticket to:
 
 - Existing OB.DAAC tools (e.g., `fd_matchup.py`) perform satellite-vs-satellite
   or satellite-vs-in-situ collocation.
-- SeaDAS provides UI integration but relies on local execution.
+- SeaDAS does not provide UI integration. It relies on local execution.
 - The long-term goal is to provide a **Harmony-based workflow** that:
   - Uses CMR/Harmony search and HOSS subsetting
   - Runs matchup computation in a containerized environment
