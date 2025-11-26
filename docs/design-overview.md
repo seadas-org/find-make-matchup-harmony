@@ -281,6 +281,65 @@ the initial implementation simple and universal while still acknowledging the
 long-term value of automated target-list creation for SeaBASS and other
 data-driven workflows.
 
+---
+
+## 3.8 Limitations of Native CMR/Harmony Search Relative to Matchup Requirements
+
+The existing CMR and Harmony Search capabilities are powerful for discovering
+granules based on collection ID, temporal range, and coarse spatial metadata.
+However, the full set of inputs and behaviors required for OB.DAAC matchup
+workflows (Sections 2 and 3) extend beyond what CMR/Harmony search can natively
+provide.
+
+Key limitations that impact Find Matchups and Make Matchups workflows include:
+
+### 3.8.1 Target-List Based Search
+CMR does not support submitting an array of target points (time + latitude +
+longitude) and receiving matches per target. Each target must be translated into
+one or more individual search queries, and the aggregation of results must be
+implemented by a higher-level service.
+
+### 3.8.2 Per-Target Time Windows
+While CMR supports temporal range filtering, it does not accept “per-target
+±Δt” windows. For a list of targets, the service must compute individual
+temporal windows and issue separate queries.
+
+### 3.8.3 Spatial Distance Tolerances
+CMR supports bounding box, polygon, and point searches, but it does not support:
+- pixel-level distance tolerances (e.g., “within X km”), or
+- target-specific spatial buffers  
+These must be implemented in a downstream step (or approximated via metadata).
+
+### 3.8.4 Geometry, Pixel Quality, and L2 Content-Based Filters
+Key matchup inputs such as:
+- viewing geometry constraints,
+- solar/sensor zenith limits,
+- L2 flags,
+- cloud masking,
+- radiance/reflectance validity,
+
+are characteristics of the *data contents*, not the granule metadata. CMR does
+not support filtering based on L2 variable contents or pixel-level attributes.
+These must be handled by subsequent processing stages or custom containers.
+
+### 3.8.5 Collection Relationships (Primary vs Secondary)
+The concept of “primary vs secondary granules” is a logical construct of OB.DAAC
+matchup tools, not a CMR search concept. Multiple coordinated searches and custom
+logic are required to support this relationship.
+
+---
+
+### Summary
+
+The Universal Find Matchups service must therefore:
+- orchestrate multiple CMR/Harmony search calls,
+- build per-target spatial and temporal queries,
+- merge and organize results by target,
+- apply additional logic beyond what CMR natively supports.
+
+This confirms that the Find Matchups service will be a lightweight but necessary
+intermediate layer between user-facing APIs and the underlying CMR/Harmony
+search system.
 
 ## 4. Mapping to Harmony Components
 
