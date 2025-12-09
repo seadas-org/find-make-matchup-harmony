@@ -415,11 +415,4 @@ Examples:
 See [`workflow-diagram.md`](workflow-diagram.md) and the `diagrams/` directory
 for Mermaid source and any exported PNGs/SVGs.
 
----
-## 8. Next Steps
-
-- Complete description of the current OB.DAAC matchup logic
-- Fill in the component mapping table
-- Refine the Harmony workflow and inputs/outputs
-- Use this document as the basis for the first prototype container design
 
