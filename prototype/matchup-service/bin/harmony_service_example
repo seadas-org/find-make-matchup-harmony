@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -ex
+
+find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+
+args=""
+
+if [ -d ../harmony-service-lib-py ]; then
+  (cd ../harmony-service-lib-py && make clean)
+  args="$args -v $(pwd)/../harmony-service-lib-py/harmony_service_lib:/usr/lib/harmony-service-lib-py/harmony_service_lib"
+  args="$args -e PYTHONPATH=/usr/lib/harmony-service-lib-py"
+fi
+
+# Import variables from .env file if one exists
+if [ -f .env ]; then
+  args="$args --env-file=.env"
+fi
+
+docker run --rm -it -v $(pwd):/home $args harmonyservices/service-example "$@"
+
