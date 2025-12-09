@@ -3,7 +3,6 @@
 
 ## 3️⃣ `docs/design-overview.md`
 
-```markdown
 # Design Overview: Find & Make Matchup Harmony Workflow
 
 This document describes the **analysis and design** for a Harmony-based
@@ -24,7 +23,7 @@ It supports the initial design ticket to:
 
 - Existing OB.DAAC tools (e.g., `fd_matchup.py`) perform satellite-vs-satellite
   or satellite-vs-in-situ collocation.
-- SeaDAS provides UI integration but relies on local execution.
+- SeaDAS does not provide UI integration. It relies on local execution.
 - The long-term goal is to provide a **Harmony-based workflow** that:
   - Uses CMR/Harmony search and HOSS subsetting
   - Runs matchup computation in a containerized environment
@@ -37,28 +36,77 @@ As this document evolves, it should capture both **current behavior** and the
 
 ## 2. Existing OB.DAAC Matchup Logic (Summary)
 
-> To be filled in as you review `fd_matchup.py` and related tools.
+The current “Find and Make Matchup” capability at OB.DAAC is implemented through
+the Python module `fd_matchup.py`. It performs pixel-level collocation between a
+primary dataset and one or more secondary datasets (e.g., satellite-to-satellite
+or satellite-to-in situ).
 
-Suggested content:
+### 2.1 Inputs
 
-- **Inputs**
-  - Primary collection and granules
-  - Secondary collection(s) and search parameters
-  - Time and space tolerances
-  - Angle / geometry constraints (if applicable)
-  - Quality flags / filtering options
+Typical inputs include:
 
-- **Processing steps**
-  - How primary and secondary granules are discovered
-  - How spatial and temporal matching is performed
-  - Any interpolation or aggregation logic
+- Primary granule(s)  
+- Secondary collection(s)  
+- Time window (e.g., ±3 hours)  
+- Spatial distance tolerance (pixel-to-pixel)  
+- Pixel selection options  
+- Optional geometry constraints (solar/viewing zenith, relative azimuth)  
+- Quality filters (L2 flags, cloud masking)  
+- Output format (CSV/ASCII)
 
-- **Outputs**
-  - File format (CSV, ASCII, NetCDF, etc.)
-  - Variable/content structure (columns, groups, metadata)
-  - How outputs are currently consumed (SeaDAS, downstream tools)
+### 2.2 Granule Discovery and Preparation
 
----
+1. Parse metadata for the primary granule (time, footprint).  
+2. Identify candidate secondary granules based on:
+   - Time window  
+   - Potential spatial overlap  
+
+This may use CMR-like metadata queries or internal OB.DAAC indexing.
+
+### 2.3 Temporal Filtering
+
+For each secondary granule:
+- Compute time difference with the primary
+- Keep only granules within the user-specified Δt window
+
+### 2.4 Spatial Filtering
+
+For each remaining secondary granule:
+- Load geolocation arrays  
+- Perform coarse overlap filtering (bounding box or swath intersection)  
+- Optionally refine with pixel-level distance checks  
+
+### 2.5 Pixel-Level Matchup Computation
+
+For each primary pixel:
+
+- Find nearest valid pixel(s) in secondary dataset within distance tolerance  
+- Compute:
+  - Temporal difference  
+  - Spatial separation  
+  - Validity of angular constraints  
+
+If all conditions pass, a matchup record is created.
+
+### 2.6 Quality Screening
+
+Apply quality masks such as:
+- L2 flags  
+- Cloud screening  
+- Invalid or fill-value masking  
+
+### 2.7 Output Generation
+
+The tool writes a matchup product—typically CSV or ASCII—with fields such as:
+
+- Coordinates of primary and secondary pixels  
+- Δt (time difference)  
+- Δd (distance)  
+- Matched radiometric/reflectance values  
+- Viewing geometry  
+- Additional metadata needed for interpretation  
+
+This output is consumed by downstream tools (e.g., SeaDAS).
 
 ---
 
@@ -233,6 +281,65 @@ the initial implementation simple and universal while still acknowledging the
 long-term value of automated target-list creation for SeaBASS and other
 data-driven workflows.
 
+---
+
+## 3.8 Limitations of Native CMR/Harmony Search Relative to Matchup Requirements
+
+The existing CMR and Harmony Search capabilities are powerful for discovering
+granules based on collection ID, temporal range, and coarse spatial metadata.
+However, the full set of inputs and behaviors required for OB.DAAC matchup
+workflows (Sections 2 and 3) extend beyond what CMR/Harmony search can natively
+provide.
+
+Key limitations that impact Find Matchups and Make Matchups workflows include:
+
+### 3.8.1 Target-List Based Search
+CMR does not support submitting an array of target points (time + latitude +
+longitude) and receiving matches per target. Each target must be translated into
+one or more individual search queries, and the aggregation of results must be
+implemented by a higher-level service.
+
+### 3.8.2 Per-Target Time Windows
+While CMR supports temporal range filtering, it does not accept “per-target
+±Δt” windows. For a list of targets, the service must compute individual
+temporal windows and issue separate queries.
+
+### 3.8.3 Spatial Distance Tolerances
+CMR supports bounding box, polygon, and point searches, but it does not support:
+- pixel-level distance tolerances (e.g., “within X km”), or
+- target-specific spatial buffers  
+These must be implemented in a downstream step (or approximated via metadata).
+
+### 3.8.4 Geometry, Pixel Quality, and L2 Content-Based Filters
+Key matchup inputs such as:
+- viewing geometry constraints,
+- solar/sensor zenith limits,
+- L2 flags,
+- cloud masking,
+- radiance/reflectance validity,
+
+are characteristics of the *data contents*, not the granule metadata. CMR does
+not support filtering based on L2 variable contents or pixel-level attributes.
+These must be handled by subsequent processing stages or custom containers.
+
+### 3.8.5 Collection Relationships (Primary vs Secondary)
+The concept of “primary vs secondary granules” is a logical construct of OB.DAAC
+matchup tools, not a CMR search concept. Multiple coordinated searches and custom
+logic are required to support this relationship.
+
+---
+
+### Summary
+
+The Universal Find Matchups service must therefore:
+- orchestrate multiple CMR/Harmony search calls,
+- build per-target spatial and temporal queries,
+- merge and organize results by target,
+- apply additional logic beyond what CMR natively supports.
+
+This confirms that the Find Matchups service will be a lightweight but necessary
+intermediate layer between user-facing APIs and the underlying CMR/Harmony
+search system.
 
 ## 4. Mapping to Harmony Components
 
@@ -308,11 +415,4 @@ Examples:
 See [`workflow-diagram.md`](workflow-diagram.md) and the `diagrams/` directory
 for Mermaid source and any exported PNGs/SVGs.
 
----
-## 8. Next Steps
-
-- Complete description of the current OB.DAAC matchup logic
-- Fill in the component mapping table
-- Refine the Harmony workflow and inputs/outputs
-- Use this document as the basis for the first prototype container design
 
