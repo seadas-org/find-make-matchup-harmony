@@ -3,7 +3,7 @@
 from typing import List
 from harmony import BaseHarmonyAdapter
 from harmony.util import download                # name may differ; check example
-from .matchup_engine import MatchupConfig, run_matchup
+from matchup_engine import MatchupConfig, run_matchup
 
 class MatchupAdapter(BaseHarmonyAdapter):
 

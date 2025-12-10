@@ -7,5 +7,7 @@ dependencies:
   - pip~=20.1
   - python=3.9
   - libgdal-netcdf=3.10.0
+  - numpy
+  - netcdf4
   - pip:
     - git+https://github.com/nasa/harmony-service-lib-py.git
