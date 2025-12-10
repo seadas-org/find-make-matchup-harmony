@@ -135,3 +135,16 @@ deps
 .dccache
 
 .vscode
+.idea
+
+# PyCharm
+.idea/
+
+# Python caches
+*.pyc
+
+# Editor backups/swap
+*~            # e.g. file.md~
+*.un~
+*.swp~
+*.swo
