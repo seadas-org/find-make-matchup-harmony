@@ -1,6 +1,6 @@
 import pytest
 
-from harmony_service_example.geo import clip_bbox, latlon_intersection, _range_intersection
+from geo import clip_bbox, latlon_intersection, _range_intersection
 
 
 def test_clip_identical():
