@@ -1,0 +1,22 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "matchup-input-001",
+  "geometry": null,
+  "bbox": null,
+  "properties": {
+    "datetime": "2024-05-24T18:40:01Z"
+  },
+  "assets": {
+    "seabass": {
+      "href": "file:///ABSOLUTE/PATH/TO/YOUR/SEABASS.sb",
+      "media_type": "text/plain",
+      "roles": ["data"]
+    },
+    "l2": {
+      "href": "file:///ABSOLUTE/PATH/TO/YOUR/L2_FILE.nc",
+      "media_type": "application/x-netcdf",
+      "roles": ["data"]
+    }
+  }
+}
