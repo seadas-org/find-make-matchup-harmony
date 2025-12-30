@@ -33,6 +33,7 @@ python run_local_matchup.py \
   --mode window
 ```
 
+In the ".\find-make-matchup-harmony\prototype\matchup-service" directory, run
 ```bash
  python run_local_matchup.py --seabass testdata\seabass_files\VIIRS_2024_HPLC_NASA_R1.sb --l2 testdata\l2_files\AQUA_MODIS.20240520T191501.L2.SST.nc --out testdata\output\VIIRS_2024_HPLC_NASA_R1.AQUA_MODIS_20240520T191501.matchup.sb --vars sst --max-distance-km 5 --max-time-sec 10800 --mode window
 ```
