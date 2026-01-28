@@ -23,7 +23,6 @@ additional satellite-derived columns.
 """
 
 from __future__ import annotations
-
 from typing import Any, Dict, List, Sequence
 
 from .seabass_parser import (
@@ -37,6 +36,96 @@ from .l2_loader import (
 )
 from .match_row import match_record_to_l2
 
+def _delimiter_char(delim_token: str | None) -> str:
+    """
+    SeaBASS header often uses tokens like 'comma' or 'tab'. Data lines must use actual characters.
+    """
+    if not delim_token:
+        return ","  # safe default
+
+    t = delim_token.strip().lower()
+
+    if t in ("comma", ","):
+        return ","
+    if t in ("tab", r"\t", "\\t"):
+        return "\t"
+    if t in ("space", "spaces", "whitespace", " "):
+        return " "
+
+    # If user put an actual delimiter char in header, accept it
+    if len(t) == 1:
+        return t
+
+    # fallback
+    return ","
+
+
+def _format_value(value: Any, missing_token: str, float_precision: int = 10) -> str:
+    """
+    Convert Python values to strings suitable for SeaBASS output.
+    """
+    if value is None:
+        return missing_token
+
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return missing_token
+        return f"{value:.{float_precision}g}"
+
+    return str(value)
+
+
+def _format_original_field(field: str, rec, header: Dict[str, Any]) -> str:
+    """
+    Format original SeaBASS fields with SeaBASS-friendly conventions:
+      - date: yyyymmdd
+      - time: HH:MM:SS
+      - datetime (if present): ISO-like without timezone suffix
+      - lat/lon: decimal degrees (reasonable precision)
+    """
+    missing = str(header.get("missing", "NaN"))
+    lf = field.lower()
+
+    if lf == "date":
+        return rec.time.strftime("%Y%m%d")
+    if lf == "time":
+        return rec.time.strftime("%H:%M:%S")
+    if lf == "datetime":
+        return rec.time.strftime("%Y-%m-%dT%H:%M:%S")
+    if lf == "lat":
+        return f"{rec.lat:.6f}".rstrip("0").rstrip(".")
+    if lf == "lon":
+        return f"{rec.lon:.6f}".rstrip("0").rstrip(".")
+    if lf in ("depth", "z"):
+        return _format_value(rec.depth, missing)
+
+    v = rec.variables.get(field)
+    return _format_value(v, missing)
+
+
+def _format_record_row(
+    rec,
+    sat_cols: Dict[str, Any],
+    original_fields: Sequence[str],
+    new_fields: Sequence[str],
+    header: Dict[str, Any],
+) -> List[str]:
+    """
+    Construct full output row values list (original fields + appended matchup fields).
+    """
+    missing = str(header.get("missing", "NaN"))
+
+    values: List[str] = []
+
+    # 1) Original fields in the original order
+    for field in original_fields:
+        values.append(_format_original_field(field, rec, header))
+
+    # 2) New appended fields in the order new_fields[len(original_fields):]
+    for field in new_fields[len(original_fields):]:
+        values.append(_format_value(sat_cols.get(field), missing))
+
+    return values
 
 def _get_delimiter_from_header(header: Dict[str, Any]) -> str:
     token = header.get("delimiter", "tab").lower()
@@ -122,76 +211,6 @@ def _build_new_units(
     return new_units
 
 
-def _format_value(
-    value,
-    missing_token: str,
-    float_precision: int = 6,
-) -> str:
-    """
-    Convert Python values to strings suitable for SeaBASS output.
-    """
-    if value is None:
-        return missing_token
-
-    if isinstance(value, float):
-        if value != value:  # NaN
-            return missing_token
-        return f"{value:.{float_precision}g}"
-
-    return str(value)
-
-
-def _format_record_row(
-    rec: SeaBASSRecord,
-    sat_cols: Dict[str, Any],
-    original_fields: Sequence[str],
-    new_fields: Sequence[str],
-    header: Dict[str, Any],
-) -> List[str]:
-    """
-    Construct a full output row string list for one SeaBASSRecord,
-    including the original fields (reconstructed) and new satellite
-    columns (from sat_cols).
-    """
-    missing = header.get("missing", "NaN")
-
-    # Precompute date/time strings
-    date_str = rec.time.strftime("%Y-%m-%d")
-    time_str = rec.time.strftime("%H:%M:%S")
-    datetime_str = rec.time.strftime("%Y-%m-%dT%H:%M:%S")
-
-    # 1) Original fields, in original order
-    values: List[str] = []
-    lower_fields = [f.lower() for f in original_fields]
-
-    for field, lf in zip(original_fields, lower_fields):
-        if lf == "lat":
-            val = _format_value(rec.lat, missing)
-        elif lf == "lon":
-            val = _format_value(rec.lon, missing)
-        elif lf == "date":
-            val = date_str
-        elif lf == "time":
-            val = time_str
-        elif lf == "datetime":
-            val = datetime_str
-        elif lf in ("depth", "z"):
-            val = _format_value(rec.depth, missing)
-        else:
-            v = rec.variables.get(field)
-            val = _format_value(v, missing)
-        values.append(val)
-
-    # 2) New fields (metric + sat stats) in the order they were built
-    #    i.e., new_fields[len(original_fields):]
-    for field in new_fields[len(original_fields):]:
-        v = sat_cols.get(field)
-        val = _format_value(v, missing)
-        values.append(val)
-
-    return values
-
-
 def append_satellite_to_seabass(
     seabass_path: str,
     l2_path: str,
@@ -241,8 +260,8 @@ def append_satellite_to_seabass(
         variable_names=variable_names,
     )
 
-    delimiter = _get_delimiter_from_header(seabass.header)
-    missing = seabass.header.get("missing", "NaN")
+    # IMPORTANT: header stores token like "comma" but data needs actual char ","
+    delim_char = _delimiter_char(seabass.header.get("delimiter"))
 
     # Rewrite header lines with updated /fields= and /units=
     raw_header_lines = seabass.header.get("raw_header_lines", [])
@@ -252,28 +271,30 @@ def append_satellite_to_seabass(
     header_out: List[str] = []
 
     for line in raw_header_lines:
-        lower = line.lower()
-        if lower.startswith("/fields="):
+        lower = line.strip().lower()
+        if lower.startswith("/fields=") or lower.startswith("fields="):
             header_out.append("/fields=" + ",".join(new_fields))
             written_fields = True
-        elif lower.startswith("/units="):
+        elif lower.startswith("/units=") or lower.startswith("units="):
             header_out.append("/units=" + ",".join(new_units))
             written_units = True
         else:
             header_out.append(line)
 
-    # If, for some reason, original header lacked /fields or /units,
-    # append them at the end.
     if not written_fields:
         header_out.append("/fields=" + ",".join(new_fields))
     if not written_units:
         header_out.append("/units=" + ",".join(new_units))
 
+    # Ensure output directory exists
+    import os
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
     # Write output file
-    with open(output_path, "w") as out:
+    with open(output_path, "w", encoding="utf-8", newline="\n") as out:
         # Header
         for line in header_out:
-            out.write(line + "\n")
+            out.write(line.rstrip("\n") + "\n")
 
         # Data rows
         for rec in seabass.records:
@@ -295,6 +316,6 @@ def append_satellite_to_seabass(
                 header=seabass.header,
             )
 
-            out.write(delimiter.join(row_vals) + "\n")
-
+            # Use correct delimiter CHARACTER here ("," not "comma")
+            out.write(delim_char.join(row_vals) + "\n")
     return output_path

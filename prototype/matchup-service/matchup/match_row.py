@@ -1,255 +1,253 @@
 # matchup/match_row.py
 
-"""
-Per-row matchup logic (Subtask 5).
-
-Given a single SeaBASSRecord and an L2Grid, apply:
-  - spatial/time/flag filters (from filters.py)
-  - either window-based aggregation or nearest-pixel extraction
-  - return a dict of satellite-derived columns for that row
-"""
-
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple, Any
 
 import numpy as np
 
-from .seabass_parser import SeaBASSRecord
-from .l2_loader import L2Grid
-from .filters import (
-    build_valid_pixel_mask,
-    find_nearest_valid_pixel,
-    haversine_distance_km,
-)
-from .aggregator import aggregate_values
+from matchup.l2_loader import L2Grid
+from matchup.seabass_parser import SeaBASSRecord
 
 
-def _compute_distance_metrics(
-    seabass_rec: SeaBASSRecord,
-    l2: L2Grid,
-    rows: np.ndarray,
-    cols: np.ndarray,
-) -> Optional[float]:
+# ----------------------------
+# Utilities
+# ----------------------------
+
+def haversine_km(lat1, lon1, lat2, lon2) -> np.ndarray:
     """
-    Compute minimum great-circle distance (km) from the SeaBASS point
-    to the set of selected pixel indices.
-
-    Returns None if rows/cols are empty.
+    Vectorized haversine distance.
+    lat/lon in degrees. Returns km.
     """
+    R = 6371.0
+    lat1r = np.deg2rad(lat1)
+    lon1r = np.deg2rad(lon1)
+    lat2r = np.deg2rad(lat2)
+    lon2r = np.deg2rad(lon2)
+    dlat = lat2r - lat1r
+    dlon = lon2r - lon1r
+    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1r) * np.cos(lat2r) * np.sin(dlon / 2.0) ** 2
+    return 2.0 * R * np.arcsin(np.sqrt(a))
+
+
+def _compute_min_distance_km(seabass_rec: SeaBASSRecord, l2: L2Grid, rows: np.ndarray, cols: np.ndarray) -> Optional[float]:
     if rows.size == 0:
         return None
-
-    lats = l2.lat[rows, cols]
-    lons = l2.lon[rows, cols]
-
-    dists = haversine_distance_km(
-        seabass_rec.lat,
-        seabass_rec.lon,
-        lats,
-        lons,
-    )
-    return float(np.min(dists))
+    lat = l2.lat[rows, cols].astype("float64")
+    lon = l2.lon[rows, cols].astype("float64")
+    d = haversine_km(seabass_rec.lat, seabass_rec.lon, lat, lon)
+    d = d[np.isfinite(d)]
+    if d.size == 0:
+        return None
+    return float(np.min(d))
 
 
-def _compute_time_metrics(
+def _compute_time_metrics_from_l2_time(
     seabass_rec: SeaBASSRecord,
     l2: L2Grid,
     rows: np.ndarray,
     cols: np.ndarray,
 ) -> Optional[float]:
     """
-    Compute minimum |Δt| in seconds between the SeaBASS time and the
-    selected pixel times.
+    Compute min |Δt| using l2.time if available.
 
-    Returns None if no time info is available or selection is empty.
+    Supports:
+      - per-pixel time: shape == l2.lat.shape
+      - per-line time:  1D array with length == number of rows in l2.lat
+    Assumes l2.time values are epoch seconds (float).
     """
-    if l2.time is None or rows.size == 0:
+    if rows.size == 0 or l2.time is None:
         return None
 
-    time_arr = np.array(l2.time)
+    try:
+        time_arr = np.asarray(l2.time, dtype="float64")
+    except Exception:
+        return None
 
-    # Case 1: per-pixel time with same shape as lat/lon
+    center_sec = float(seabass_rec.time.timestamp())
+
+    # Case 1: per-pixel
     if time_arr.shape == l2.lat.shape:
-        try:
-            pixel_times = time_arr[rows, cols].astype(np.float64)
-        except Exception:
-            return None
-    # Case 2: 1D time array per line
-    elif time_arr.ndim == 1 and l2.lat.ndim == 2 and time_arr.shape[0] == l2.lat.shape[0]:
-        try:
-            # Use row index to pick line times and broadcast to columns
-            pixel_times = time_arr[rows].astype(np.float64)
-        except Exception:
-            return None
+        pixel_times = time_arr[rows, cols]
+    # Case 2: per-scanline/per-row
+    elif time_arr.ndim == 1 and time_arr.shape[0] == l2.lat.shape[0]:
+        pixel_times = time_arr[rows]
     else:
-        # Any other time shape: ignore for prototype
         return None
 
-    center_sec = seabass_rec.time.timestamp()
     diffs = np.abs(pixel_times - center_sec)
-
-    # If 1D per-line, diffs is 1D; that’s fine – min still makes sense.
+    diffs = diffs[np.isfinite(diffs)]
+    if diffs.size == 0:
+        return None
     return float(np.min(diffs))
 
+
+def _compute_min_dt_sec(
+    seabass_rec: SeaBASSRecord,
+    l2: L2Grid,
+    rows: np.ndarray,
+    cols: np.ndarray,
+) -> Optional[float]:
+    """
+    Compute min |Δt| in seconds.
+    Prefer l2.time if available; otherwise fall back to l2.granule_datetime_utc.
+    """
+    # 1) Prefer per-pixel/per-line time if present
+    dt = _compute_time_metrics_from_l2_time(seabass_rec, l2, rows, cols)
+    if dt is not None:
+        return dt
+
+    # 2) Fallback: granule reference time parsed from filename
+    gdt = getattr(l2, "granule_datetime_utc", None)
+    if gdt is not None:
+        try:
+            return float(abs(gdt.timestamp() - seabass_rec.time.timestamp()))
+        except Exception:
+            return None
+
+    return None
+
+
+def _apply_flag_mask(flags: np.ndarray, bad_flag_mask: int) -> np.ndarray:
+    """
+    Returns boolean array True where pixel is GOOD (i.e., no bad flags set).
+    flags is uint bitmask array; bad_flag_mask is int.
+    """
+    return (flags & np.uint32(bad_flag_mask)) == 0
+
+
+def _subset_window_indices(
+    seabass_rec: SeaBASSRecord,
+    l2: L2Grid,
+    max_distance_km: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Select all pixels within a radius of seabass point.
+    Returns (rows, cols) index arrays.
+    """
+    d = haversine_km(seabass_rec.lat, seabass_rec.lon, l2.lat.astype("float64"), l2.lon.astype("float64"))
+    mask = np.isfinite(d) & (d <= max_distance_km)
+    rows, cols = np.where(mask)
+    return rows, cols
+
+
+def _subset_nearest_indices(
+    seabass_rec: SeaBASSRecord,
+    l2: L2Grid,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Find nearest pixel by squared distance in lat/lon space (fast, good enough for prototype).
+    """
+    dist2 = (l2.lat.astype("float64") - seabass_rec.lat) ** 2 + (l2.lon.astype("float64") - seabass_rec.lon) ** 2
+    i, j = np.unravel_index(np.nanargmin(dist2), dist2.shape)
+    return np.array([i], dtype=int), np.array([j], dtype=int)
+
+
+def _aggregate(values: np.ndarray) -> Dict[str, Any]:
+    """
+    Aggregate numeric values (expects 1D array of finite floats).
+    """
+    if values.size == 0:
+        return {"mean": None, "median": None, "std": None, "n": 0}
+
+    # ddof=0: population std
+    return {
+        "mean": float(np.mean(values)),
+        "median": float(np.median(values)),
+        "std": float(np.std(values, ddof=0)),
+        "n": int(values.size),
+    }
+
+
+# ----------------------------
+# Main per-row matcher
+# ----------------------------
 
 def match_record_to_l2(
     seabass_rec: SeaBASSRecord,
     l2: L2Grid,
     variable_names: Sequence[str],
-    max_distance_km: Optional[float],
-    max_time_diff_sec: Optional[float],
-    bad_flag_mask: Optional[int],
+    max_distance_km: float,
+    max_time_diff_sec: float,
+    bad_flag_mask: Optional[int] = None,
     mode: str = "window",
 ) -> Dict[str, Any]:
     """
-    Perform a satellite matchup for a single SeaBASS record.
-
-    Args:
-        seabass_rec: In-situ measurement (lat, lon, time, depth, variables).
-        l2: L2Grid for a single OB.DAAC L2 granule.
-        variable_names: List of geophysical variable names to extract.
-        max_distance_km: Max allowed distance from in-situ point.
-        max_time_diff_sec: Max allowed |Δt| in seconds.
-        bad_flag_mask: Bitmask of "bad" flags to reject (see filters.build_flag_mask).
-        mode:
-            "window"  → aggregate over all valid pixels in the window
-            "nearest" → use only the nearest valid pixel
-
-    Returns:
-        Dict of satellite-derived columns keyed like:
-            sat_<var>_mean
-            sat_<var>_median
-            sat_<var>_std
-            sat_<var>_n
-        plus some generic matchup metrics:
-            matchup_min_distance_km
-            matchup_min_dt_sec
+    Match one SeaBASS record against one L2 granule and return computed matchup columns.
     """
-    result: Dict[str, Any] = {}
-
-    variable_names = [v.strip() for v in variable_names if v and v.strip()]
+    result: Dict[str, Any] = {
+        "matchup_min_distance_km": None,
+        "matchup_min_dt_sec": None,
+    }
 
     if mode not in ("window", "nearest"):
-        mode = "window"
+        raise ValueError(f"Unsupported mode: {mode}")
 
+    # Select pixels
     if mode == "nearest":
-        # Find a single nearest valid pixel
-        idx = find_nearest_valid_pixel(
-            l2=l2,
-            seabass_rec=seabass_rec,
-            max_distance_km=max_distance_km,
-            max_time_diff_sec=max_time_diff_sec,
-            bad_flag_mask=bad_flag_mask,
-        )
+        rows, cols = _subset_nearest_indices(seabass_rec, l2)
+    else:
+        rows, cols = _subset_window_indices(seabass_rec, l2, max_distance_km)
 
-        if idx is None:
-            # No valid pixel: fill with None / 0 for all requested vars
-            for var in variable_names:
-                prefix = f"sat_{var}"
-                result[f"{prefix}_mean"] = None
-                result[f"{prefix}_median"] = None
-                result[f"{prefix}_std"] = None
-                result[f"{prefix}_n"] = 0
-            result["matchup_min_distance_km"] = None
-            result["matchup_min_dt_sec"] = None
-            return result
-
-        row, col = idx
-
-        # Distance metric (single pixel)
-        d_km = haversine_distance_km(
-            seabass_rec.lat,
-            seabass_rec.lon,
-            l2.lat[row, col],
-            l2.lon[row, col],
-        )
-        result["matchup_min_distance_km"] = float(d_km)
-
-        # Time metric (single pixel)
-        if l2.time is not None:
-            time_arr = np.array(l2.time)
-            try:
-                if time_arr.shape == l2.lat.shape:
-                    t_val = float(time_arr[row, col])
-                elif time_arr.ndim == 1 and l2.lat.ndim == 2 and time_arr.shape[0] == l2.lat.shape[0]:
-                    t_val = float(time_arr[row])
-                else:
-                    t_val = None
-            except Exception:
-                t_val = None
-
-            if t_val is not None:
-                dt = abs(t_val - seabass_rec.time.timestamp())
-                result["matchup_min_dt_sec"] = float(dt)
-            else:
-                result["matchup_min_dt_sec"] = None
-        else:
-            result["matchup_min_dt_sec"] = None
-
-        # Aggregated stats for each variable (single-pixel = degenerate window)
-        for var in variable_names:
-            arr = l2.variables.get(var)
-            prefix = f"sat_{var}"
-            if arr is None:
-                # Variable missing in this file
-                result[f"{prefix}_mean"] = None
-                result[f"{prefix}_median"] = None
-                result[f"{prefix}_std"] = None
-                result[f"{prefix}_n"] = 0
-                continue
-
-            vals = np.asarray(arr[row, col:col + 1])  # 1-element slice
-            stats = aggregate_values(vals)
-            result[f"{prefix}_mean"] = stats["mean"]
-            result[f"{prefix}_median"] = stats["median"]
-            result[f"{prefix}_std"] = stats["std"]
-            result[f"{prefix}_n"] = stats["count"]
-
+    if rows.size == 0:
+        # No spatial candidates
+        for v in variable_names:
+            result[f"sat_{v}_mean"] = None
+            result[f"sat_{v}_median"] = None
+            result[f"sat_{v}_std"] = None
+            result[f"sat_{v}_n"] = 0
         return result
 
-    # --- mode == "window" ---------------------------------------------------
+    # Time tolerance filter (if we can compute dt)
+    dt_min = _compute_min_dt_sec(seabass_rec, l2, rows, cols)
+    if dt_min is not None and dt_min > max_time_diff_sec:
+        # Too far in time; treat as no match
+        for v in variable_names:
+            result[f"sat_{v}_mean"] = None
+            result[f"sat_{v}_median"] = None
+            result[f"sat_{v}_std"] = None
+            result[f"sat_{v}_n"] = 0
+        # still record dt_min for debugging if you want:
+        result["matchup_min_dt_sec"] = dt_min
+        # and distance:
+        result["matchup_min_distance_km"] = _compute_min_distance_km(seabass_rec, l2, rows, cols)
+        return result
 
-    mask = build_valid_pixel_mask(
-        l2=l2,
-        seabass_rec=seabass_rec,
-        max_distance_km=max_distance_km,
-        max_time_diff_sec=max_time_diff_sec,
-        bad_flag_mask=bad_flag_mask,
-    )
+    # Apply flag filter if available
+    if bad_flag_mask is not None and l2.flags is not None:
+        good = _apply_flag_mask(l2.flags[rows, cols].astype(np.uint32), int(bad_flag_mask))
+        rows = rows[good]
+        cols = cols[good]
+        if rows.size == 0:
+            for v in variable_names:
+                result[f"sat_{v}_mean"] = None
+                result[f"sat_{v}_median"] = None
+                result[f"sat_{v}_std"] = None
+                result[f"sat_{v}_n"] = 0
+            return result
 
-    rows, cols = np.where(mask)
+    # Record metrics
+    result["matchup_min_distance_km"] = _compute_min_distance_km(seabass_rec, l2, rows, cols)
+    result["matchup_min_dt_sec"] = _compute_min_dt_sec(seabass_rec, l2, rows, cols)
 
-    # Distance/time metrics (can be None if no pixels)
-    result["matchup_min_distance_km"] = _compute_distance_metrics(
-        seabass_rec, l2, rows, cols
-    )
-    result["matchup_min_dt_sec"] = _compute_time_metrics(
-        seabass_rec, l2, rows, cols
-    )
-
-    # For each variable: aggregate window values (or return None/0)
-    for var in variable_names:
-        prefix = f"sat_{var}"
-        arr = l2.variables.get(var)
+    # Aggregate each requested variable
+    for v in variable_names:
+        arr = l2.variables.get(v)
         if arr is None:
-            # Not present in this granule
-            result[f"{prefix}_mean"] = None
-            result[f"{prefix}_median"] = None
-            result[f"{prefix}_std"] = None
-            result[f"{prefix}_n"] = 0
+            result[f"sat_{v}_mean"] = None
+            result[f"sat_{v}_median"] = None
+            result[f"sat_{v}_std"] = None
+            result[f"sat_{v}_n"] = 0
             continue
 
-        if rows.size == 0:
-            # No valid pixels in window
-            stats = aggregate_values([])  # empty
-        else:
-            vals = arr[rows, cols]
-            stats = aggregate_values(vals)
+        vals = arr[rows, cols].astype("float64")
+        vals = vals[np.isfinite(vals)]
+        stats = _aggregate(vals)
 
-        result[f"{prefix}_mean"] = stats["mean"]
-        result[f"{prefix}_median"] = stats["median"]
-        result[f"{prefix}_std"] = stats["std"]
-        result[f"{prefix}_n"] = stats["count"]
+        result[f"sat_{v}_mean"] = stats["mean"]
+        result[f"sat_{v}_median"] = stats["median"]
+        result[f"sat_{v}_std"] = stats["std"]
+        result[f"sat_{v}_n"] = stats["n"]
 
     return result
