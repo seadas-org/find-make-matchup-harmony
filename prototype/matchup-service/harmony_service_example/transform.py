@@ -26,17 +26,6 @@ def _as_var_names(vars_from_source):
 
 def _pick_assets(item):
     """
-<<<<<<< HEAD
-    Heuristic to locate the SeaBASS and L2 assets within a STAC item.
-
-    Expected (prototype assumptions):
-      - one asset is SeaBASS-like: .sb/.txt
-      - one asset is L2 NetCDF: .nc/.nc4
-    """
-    assets = list(item.assets.values())
-
-    def is_seabass(a: Asset):
-=======
     Prefer explicit STAC asset keys for future-proofing:
       - assets["seabass"] : SeaBASS file
       - assets["l2"]      : L2 NetCDF granule
@@ -53,26 +42,17 @@ def _pick_assets(item):
     assets = list(item.assets.values())
 
     def is_seabass(a):
->>>>>>> 7b0c4e79c15a2ce0c00f06eb7eef6ffb935764c5
         href = (a.href or "").lower()
         mt = (a.media_type or "").lower()
         return href.endswith(".sb") or href.endswith(".txt") or ("seabass" in mt)
 
-<<<<<<< HEAD
-    def is_l2(a: Asset):
-=======
     def is_l2(a):
->>>>>>> 7b0c4e79c15a2ce0c00f06eb7eef6ffb935764c5
         href = (a.href or "").lower()
         mt = (a.media_type or "").lower()
         return href.endswith(".nc") or href.endswith(".nc4") or ("netcdf" in mt)
 
     seabass_asset = next((a for a in assets if is_seabass(a)), None)
     l2_asset = next((a for a in assets if is_l2(a)), None)
-<<<<<<< HEAD
-
-=======
->>>>>>> 7b0c4e79c15a2ce0c00f06eb7eef6ffb935764c5
     return seabass_asset, l2_asset
 
 
