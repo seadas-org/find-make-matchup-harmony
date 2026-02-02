@@ -1,0 +1,27 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "seabass-l2-test",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [-87.1583, 29.9702]
+  },
+  "bbox": [-87.1583, 29.9702, -87.1583, 29.9702],
+  "properties": {
+    "datetime": "2024-05-20T19:30:00Z"
+  },
+  "assets": {
+    "seabass": {
+      "href": "file:///home/testdata/seabass_files/VIIRS_2024_HPLC_NASA_R1.sb",
+      "type": "text/plain",
+      "roles": ["seabass"]
+    },
+    "l2_0": {
+      "href": "file:///home/testdata/l2_files/AQUA_MODIS.20240520T191501.L2.SST.nc",
+      "type": "application/x-netcdf",
+      "roles": ["l2"]
+    }
+  },
+  "links": []
+}
+
