@@ -12,7 +12,9 @@ from harmony_service_lib.util import (
 from pystac import Asset
 
 from matchup.orchestrator import append_satellite_to_seabass
-
+from urllib.parse import urlparse
+import os
+import shutil
 
 def _as_var_names(vars_from_source):
     """Harmony variables can be objects with .name or plain strings."""
@@ -142,13 +144,33 @@ class HarmonyAdapter(BaseHarmonyAdapter):
 
             # Stage the output back to Harmony
             mime = getattr(message.format, "mime", None) or "text/plain"
-            url = stage(
-                output_path,
-                output_filename,
-                mime,
-                location=message.stagingLocation,
-                logger=logger,
-            )
+
+            def stage_to_file_url(local_path: str, filename: str, staging_location: str | None) -> str | None:
+                if not staging_location:
+                    return None
+                loc = urlparse(staging_location)
+                if loc.scheme != "file":
+                    return None
+
+                dest_dir = loc.path
+                os.makedirs(dest_dir, exist_ok=True)
+
+                dest_path = os.path.join(dest_dir, filename)
+                shutil.copy2(local_path, dest_path)
+                return f"file://{dest_path}"
+
+            # 1) Prefer local file staging when Harmony gives file:// stagingLocation
+            url = stage_to_file_url(output_path, output_filename, message.stagingLocation)
+
+            # 2) Otherwise fall back to harmony-service-lib staging (S3/localstack/etc.)
+            if url is None:
+                url = stage(
+                    output_path,
+                    output_filename,
+                    mime,
+                    location=message.stagingLocation,
+                    logger=logger,
+                )
 
             result.assets["data"] = Asset(
                 url,
