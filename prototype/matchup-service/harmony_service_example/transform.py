@@ -43,12 +43,12 @@ def _pick_assets(item):
     # 2) Fallback: heuristic
     assets = list(item.assets.values())
 
-    def is_seabass(a):
+    def is_seabass(a: Asset):
         href = (a.href or "").lower()
         mt = (a.media_type or "").lower()
         return href.endswith(".sb") or href.endswith(".txt") or ("seabass" in mt)
 
-    def is_l2(a):
+    def is_l2(a: Asset):
         href = (a.href or "").lower()
         mt = (a.media_type or "").lower()
         return href.endswith(".nc") or href.endswith(".nc4") or ("netcdf" in mt)
