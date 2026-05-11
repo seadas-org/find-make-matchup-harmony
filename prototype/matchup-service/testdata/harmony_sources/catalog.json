@@ -1,0 +1,9 @@
+{
+  "type": "Catalog",
+  "stac_version": "1.0.0",
+  "id": "local-make-matchup-catalog",
+  "description": "Local STAC catalog for make matchup dev invoke",
+  "links": [
+    { "rel": "item", "href": "item.json", "type": "application/geo+json" }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "action": "invoke",
+  "requestId": "local-make-matchup-test",
+  "stagingLocation": "file:///home/testdata/output",
+  "accessToken": null,
+
+  "sources": [
+    {
+      "collection": "TEST_SEABASS_MATCHUP",
+      "variables": [
+        { "name": "sst" }
+      ]
+    }
+  ],
+
+  "items": [
+    {
+      "type": "Feature",
+      "stac_version": "1.0.0",
+      "id": "seabass-l2-test",
+      "assets": {
+        "seabass": {
+          "href": "file:///home/testdata/seabass_files/VIIRS_2024_HPLC_NASA_R1.sb",
+          "type": "text/plain",
+          "roles": ["seabass"]
+        },
+        "l2_0": {
+          "href": "file:///home/testdata/l2_files/AQUA_MODIS.20240520T191501.L2.SST.nc",
+          "type": "application/x-netcdf",
+          "roles": ["l2"]
+        }
+      }
+    }
+  ],
+
+  "format": {
+    "mime": "text/plain"
+  },
+
+  "extraParameters": {
+    "max-distance-km": 5,
+    "max-time-sec": 10800,
+    "mode": "window"
+  }
+}
