@@ -1,0 +1,25 @@
+name: Python Syntax Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  py-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile active Python modules
+        run: |
+          python -m py_compile \
+            prototype/matchup-service/harmony_service_example/*.py \
+            prototype/matchup-service/matchup/*.py \
+            prototype/matchup-service/tests/*.py \
+            prototype/matchup-service/geo.py \
+            prototype/matchup-service/run_local_matchup.py \
+            prototype/matchup-service/run_local_test.py
