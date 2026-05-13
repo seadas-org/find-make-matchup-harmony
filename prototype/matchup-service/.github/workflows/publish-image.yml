@@ -1,4 +1,4 @@
-name: Publish to DockerHub
+name: Publish Image to ECR
 
 on:
   push:
@@ -8,39 +8,45 @@ on:
     types: 
       - published
 env:
-
-  DOCKER_USER: bilts
-  DOCKER_PREFIX: harmonyservices/
-  GIT_PREFIX: nasa/harmony-
-  # Or specify a full image name not derived from the repo
-  # IMAGE_NAME: custom-org/custom-image-name
+  AWS_REGION: us-west-2
+  IMAGE_REPOSITORY: find-make-matchup-harmony
 
 jobs:
   push:
     runs-on: ubuntu-latest
     permissions:
-      packages: write
       contents: read
+    defaults:
+      run:
+        working-directory: prototype/matchup-service
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "${IMAGE_REPOSITORY}" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "${IMAGE_REPOSITORY}"
       - name: Build image
         run: |
-          mkdir -p deps
-          docker build . --file Dockerfile --tag "${GITHUB_REPOSITORY}" --label "runnumber=${GITHUB_RUN_ID}"
-      - name: Log into registry
-        run: echo "${{ secrets.DOCKERHUB }}" | docker login -u "${DOCKER_USER}" --password-stdin
-      - name: Push image
+          docker build . --file Dockerfile --tag "${IMAGE_REPOSITORY}:${GITHUB_SHA}" --label "runnumber=${GITHUB_RUN_ID}"
+      - name: Push image to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          IMAGE_NAME=${IMAGE_NAME:-$(echo "${GITHUB_REPOSITORY}" | sed "s,^${GIT_PREFIX},${DOCKER_PREFIX},g")}
-
           # For tagged versions, translate e.g. "refs/tags/v1.2.3" -> "1.2.3"
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo "$VERSION" | sed -e 's/^v//')
 
           # For the main branch, use "latest" as the version
           [ "$VERSION" == "main" ] && VERSION=latest
 
-          IMAGE_ID="${IMAGE_NAME}:${VERSION}"
+          IMAGE_ID="${REGISTRY}/${IMAGE_REPOSITORY}:${VERSION}"
           echo "Pushing ${IMAGE_ID}"
-          docker tag "${GITHUB_REPOSITORY}" "${IMAGE_ID}"
+          docker tag "${IMAGE_REPOSITORY}:${GITHUB_SHA}" "${IMAGE_ID}"
           docker push "${IMAGE_ID}"

@@ -1,10 +1,8 @@
-# Harmony Service Example
+# Find & Make Matchup Harmony Service
 
-A demonstration of a subsetter capability based on GDAL to be used with Harmony.
-
-These instructions only apply to building and developing the service.  The example
-service will be pulled automatically by Harmony from the `harmonyservices/service-example`
-repository on demand.
+These instructions apply to building and developing the Find & Make Matchup
+Harmony service. The deployment path for this prototype uses Amazon ECR and the
+`find-make-matchup-harmony` image/tag pair referenced by Harmony.
 ## Prerequisites
 
 For building & pushing the image locally:
@@ -32,7 +30,11 @@ For local development:
 
 ### Developing with a local version of the Harmony Service Library
 
-You may want to test Harmony Service Example with an unreleased version of the Harmony Service Library.  This might be someone else's feature or bug-fix branch, or perhaps your own local changes. If you haven't already, clone the Harmony Service Library and switch to an unreleased branch or make your local changes. Typically this clone would be in a sibling directory of Harmony Service Example:
+You may want to test this service with an unreleased version of the Harmony
+Service Library. This might be someone else's feature or bug-fix branch, or
+perhaps your own local changes. If you haven't already, clone the Harmony
+Service Library and switch to an unreleased branch or make your local changes.
+Typically this clone would be in a sibling directory of this repository:
 
         $ git clone https://github.com/nasa/harmony-service-lib-py ../harmony-service-lib-py
 
@@ -62,7 +64,7 @@ If you'd like the Docker image to include a local version of the Harmony Service
 If you plan to build the Docker image and are running Docker in Docker, you'll also want to create a .env file and populate it with the following:
 
 ```
-# Harmony-Service-Example Environment Variables
+# Find-Make-Matchup-Harmony Environment Variables
 
 # Set to 'true' if running Docker in Docker and the docker daemon is somewhere other than the current context
 DIND=true

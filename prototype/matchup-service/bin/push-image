@@ -2,7 +2,8 @@
 
 set -ex
 
-image="harmonyservices/service-example"
+image=${IMAGE_NAME:-find-make-matchup-harmony}
+repository=${ECR_REPOSITORY:-find-make-matchup-harmony}
 tag=${1:-latest}
 
 region=${AWS_DEFAULT_REGION-"us-west-2"}
@@ -25,12 +26,12 @@ if [ $login_status -ne 0 ]; then
   echo "Trying newer login command."
   login_password=$(aws ecr get-login-password --region ${region})
   login_password=${login_password//$'\r'/}
-  docker login --username AWS --password $login_password ${account}.dkr.ecr.${region}.amazonaws.com
+  docker login --username AWS --password "$login_password" "${account}.dkr.ecr.${region}.amazonaws.com"
 fi
 
-docker tag ${image}:${tag} ${account}.dkr.ecr.${region}.amazonaws.com/${image}:${tag}
+docker tag "${image}:${tag}" "${account}.dkr.ecr.${region}.amazonaws.com/${repository}:${tag}"
 
 # Create ECR repo if it doesn't exist
-aws ecr describe-repositories --repository-names ${image} || aws ecr create-repository --repository-name ${image}
+aws ecr describe-repositories --repository-names "${repository}" || aws ecr create-repository --repository-name "${repository}"
 
-docker push ${account}.dkr.ecr.${region}.amazonaws.com/${image}:${tag}
+docker push "${account}.dkr.ecr.${region}.amazonaws.com/${repository}:${tag}"

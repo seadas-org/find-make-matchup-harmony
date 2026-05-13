@@ -17,5 +17,4 @@ if [ -f .env ]; then
   args="$args --env-file=.env"
 fi
 
-docker run --rm -it -v $(pwd):/home $args harmonyservices/service-example "$@"
-
+docker run --rm -it -v $(pwd):/home $args find-make-matchup-harmony "$@"
