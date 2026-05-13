@@ -1,0 +1,77 @@
+{
+  "serviceName": "find-make-matchup-harmony",
+  "harmonyServiceImageTagName": "find-make-matchup-harmony",
+  "image": {
+    "registry": "ecr",
+    "repository": "find-make-matchup-harmony",
+    "defaultTag": "latest"
+  },
+  "entrypoint": "python -m harmony_service_example",
+  "adapterModule": "prototype/matchup-service/harmony_service_example/transform.py",
+  "inputContract": {
+    "itemCardinality": "one paired STAC item per process_item call",
+    "requiredAssets": [
+      {
+        "key": "seabass",
+        "mediaTypes": [
+          "text/plain"
+        ],
+        "hrefSuffixes": [
+          ".sb",
+          ".txt"
+        ]
+      },
+      {
+        "key": "l2",
+        "mediaTypes": [
+          "application/x-netcdf"
+        ],
+        "hrefSuffixes": [
+          ".nc",
+          ".nc4"
+        ]
+      }
+    ],
+    "fallbackAssetDetection": {
+      "seabass": "First asset whose href ends with .sb/.txt or whose media_type contains 'seabass'",
+      "l2": "First asset whose href ends with .nc/.nc4 or whose media_type contains 'netcdf'"
+    }
+  },
+  "parameterContract": {
+    "variables": {
+      "source": "sources[].variables[].name",
+      "type": "string[]",
+      "default": []
+    },
+    "max_distance_km": {
+      "source": "extraArgs.max_distance_km",
+      "type": "number",
+      "default": 5.0
+    },
+    "max_time_diff_sec": {
+      "source": "extraArgs.max_time_diff_sec",
+      "type": "number",
+      "default": 10800
+    },
+    "bad_flag_mask": {
+      "source": "extraArgs.bad_flag_mask",
+      "type": "integer|null",
+      "default": null
+    },
+    "mode": {
+      "source": "extraArgs.mode",
+      "type": "string",
+      "enum": [
+        "window",
+        "nearest"
+      ],
+      "default": "window"
+    }
+  },
+  "outputContract": {
+    "stacAssetKey": "data",
+    "mediaTypeDefault": "text/plain",
+    "filenameSuffix": ".sb",
+    "description": "Augmented SeaBASS file with appended matchup metrics and requested satellite statistics"
+  }
+}

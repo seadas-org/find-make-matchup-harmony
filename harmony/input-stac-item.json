@@ -1,0 +1,30 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "paired-input-001",
+  "geometry": null,
+  "bbox": null,
+  "properties": {
+    "datetime": "2024-05-20T19:15:01Z"
+  },
+  "assets": {
+    "seabass": {
+      "href": "file:///ABSOLUTE/PATH/TO/prototype/matchup-service/testdata/seabass_files/VIIRS_2024_HPLC_NASA_R1.sb",
+      "title": "SeaBASS input",
+      "type": "text/plain",
+      "media_type": "text/plain",
+      "roles": [
+        "data"
+      ]
+    },
+    "l2": {
+      "href": "https://oceandata.sci.gsfc.nasa.gov/cmr/getfile/AQUA_MODIS.20240520T191501.L2.SST.nc",
+      "title": "OB.DAAC L2 SST granule",
+      "type": "application/x-netcdf",
+      "media_type": "application/x-netcdf",
+      "roles": [
+        "data"
+      ]
+    }
+  }
+}

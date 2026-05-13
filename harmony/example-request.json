@@ -1,0 +1,41 @@
+{
+  "$schema": "https://harmony.earthdata.nasa.gov/schemas/data-operation/0.22.0/data-operation-v0.22.0.json",
+  "version": "0.22.0",
+  "callback": "https://example.org/harmony/callbacks/find-make-matchup-harmony",
+  "stagingLocation": "s3://example-public/harmony/find-make-matchup-harmony/requests/3bce9a2d-8b2a-4ec4-a79b-6a95955f0c35/",
+  "user": "jdoe",
+  "requestId": "3bce9a2d-8b2a-4ec4-a79b-6a95955f0c35",
+  "client": "harmony-uat",
+  "isSynchronous": false,
+  "sources": [
+    {
+      "collection": "C2844651289-OB_DAAC",
+      "shortName": "OB_DAAC_MATCHUP_INPUTS",
+      "versionId": "1",
+      "variables": [
+        {
+          "name": "sst",
+          "fullPath": "sst",
+          "type": "SCIENCE_VARIABLE",
+          "subtype": "OTHER"
+        }
+      ],
+      "granules": [
+        {
+          "id": "paired-input-001",
+          "name": "VIIRS_2024_HPLC_NASA_R1+AQUA_MODIS.20240520T191501",
+          "url": "s3://example-private/harmony/find-make-matchup-harmony/input-stac/paired-input-001.json"
+        }
+      ]
+    }
+  ],
+  "format": {
+    "mime": "text/plain"
+  },
+  "extraArgs": {
+    "max_distance_km": 5.0,
+    "max_time_diff_sec": 10800,
+    "bad_flag_mask": null,
+    "mode": "window"
+  }
+}
