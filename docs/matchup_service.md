@@ -83,7 +83,8 @@ The Matchup Service is implemented in two main components:
     - Writes an updated SeaBASS file.
 
 - **Harmony Adapter (`matchup_adapter.py`)**
-  - Extends the Harmony Python service template (`harmony-service-example`).
+  - Extends the Harmony Python service template and is packaged for deployment as
+    `find-make-matchup-harmony`.
   - Responsibilities:
     - Interpret Harmony job parameters (box size, filters, satellite variable list).
     - Download L2 NetCDF and SeaBASS inputs referenced in the job STAC.
@@ -98,5 +99,4 @@ In this design, the engine is **Harmony-agnostic** and can be called from the co
 | Service / Phase       | Inputs                                        | Outputs                                         | Notes                                      |
 |-----------------------|-----------------------------------------------|-------------------------------------------------|--------------------------------------------|
 | Matchup Service (MAKE)| L2 satellite NetCDF file(s); SeaBASS file(s) | Updated SeaBASS file(s) with satellite columns | SeaBASS-centric: in-situ rows + sat stats. |
-
 

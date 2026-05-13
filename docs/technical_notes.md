@@ -35,7 +35,8 @@
 
 * **Harmony Integration**
 
-  * Implement as a Harmony service using `harmony-service-example` as a base.
+  * Implement as a Harmony service using the Harmony Python service template as
+    a base, packaged as `find-make-matchup-harmony`.
   * Harmony adapter:
 
     * Accepts L2 NetCDF and SeaBASS files as inputs plus configuration parameters (box size, filters, variable list).
