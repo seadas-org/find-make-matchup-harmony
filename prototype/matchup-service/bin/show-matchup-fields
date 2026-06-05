@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Compare /fields= and /units= headers in two SeaBASS files.
+
+Usage:
+    bin/show-matchup-fields <input.sb> <output.sb>
+
+Prints the input and output field lists side by side and the columns
+appended by the matchup service (e.g. matchup_min_distance_km,
+sat_<var>_{mean,median,std,n}).
+"""
+
+import sys
+from pathlib import Path
+
+
+def header_value(path: Path, key: str) -> list[str]:
+    """Return the comma-split values from a SeaBASS header line, or []."""
+    for line in path.read_text().splitlines():
+        if line.startswith(f"/{key}="):
+            return [v.strip() for v in line[len(f"/{key}="):].split(",")]
+    return []
+
+
+def main() -> int:
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <input.sb> <output.sb>", file=sys.stderr)
+        return 2
+
+    in_path = Path(sys.argv[1])
+    out_path = Path(sys.argv[2])
+    in_fields = header_value(in_path, "fields")
+    out_fields = header_value(out_path, "fields")
+    in_set = set(in_fields)
+
+    print(f"Input  ({in_path.name}):  {len(in_fields)} fields")
+    print(f"Output ({out_path.name}): {len(out_fields)} fields")
+    print()
+
+    added = [f for f in out_fields if f not in in_set]
+    if added:
+        print(f"Appended by matchup ({len(added)}):")
+        for f in added:
+            print(f"  + {f}")
+    else:
+        print("No new fields were appended.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

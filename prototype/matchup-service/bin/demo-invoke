@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# End-to-end demo invocation:
+#   1. Pulls the published image from DockerHub
+#   2. Runs the Harmony invoke smoke test against the local testdata kit
+#   3. Prints the input vs output SeaBASS /fields= so the value-add is visible
+#
+# Idempotent. Safe to re-run. Output lands in /tmp/demo-verify (overwritten
+# each run). Override defaults via env vars: IMAGE, OUTDIR.
+
+set -e
+
+IMAGE=${IMAGE:-seadas/find-make-matchup-harmony:latest}
+OUTDIR=${OUTDIR:-/tmp/demo-verify}
+PROTO=$(cd "$(dirname "$0")/.." && pwd)
+
+echo "==> Image:   $IMAGE"
+echo "==> Out dir: $OUTDIR"
+echo
+
+# Wipe prior outputs. Prior runs may have left root-owned files (container
+# defaults to root), so delete via a throwaway container that runs as root.
+if [ -d "$OUTDIR" ]; then
+  docker run --rm -v "$OUTDIR":/work alpine:3 sh -c 'rm -rf /work/data /work/metadata' >/dev/null 2>&1 || true
+fi
+mkdir -p "$OUTDIR/data" "$OUTDIR/metadata"
+
+echo "==> Pulling $IMAGE"
+docker pull "$IMAGE"
+echo
+
+echo "==> Running Harmony invoke"
+docker run --rm -i \
+  -e STAGING_PATH=local -e STAGING_BUCKET=local-bucket \
+  -v "$PROTO":/home \
+  -v "$OUTDIR":/out \
+  "$IMAGE" \
+  --harmony-action invoke \
+  --harmony-input-file  /home/testdata/harmony_invoke_make_matchup.json \
+  --harmony-sources     /home/testdata/harmony_sources/catalog.json \
+  --harmony-metadata-dir /out/metadata \
+  --harmony-data-location file:///out/data
+echo
+
+echo "==> Output data:"
+ls -la "$OUTDIR/data"
+echo
+echo "==> Output STAC catalog + item:"
+find "$OUTDIR/metadata" -type f
+echo
+
+OUT_SB=$(find "$OUTDIR/data" -name '*.sb' | head -1)
+IN_SB="$PROTO/testdata/seabass_files/VIIRS_2024_HPLC_NASA_R1.sb"
+if [ -n "$OUT_SB" ] && [ -f "$IN_SB" ]; then
+  echo "==> Input vs output SeaBASS /fields= diff:"
+  "$PROTO/bin/show-matchup-fields" "$IN_SB" "$OUT_SB"
+fi
