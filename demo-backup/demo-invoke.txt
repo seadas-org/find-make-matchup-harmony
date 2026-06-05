@@ -1,0 +1,42 @@
+==> Image:   seadas/find-make-matchup-harmony:latest
+==> Out dir: /tmp/demo-verify
+
+==> Pulling seadas/find-make-matchup-harmony:latest
+latest: Pulling from seadas/find-make-matchup-harmony
+Digest: sha256:dc552b11b6f7a09bb89fe476878a65846638f016ef81d0064ff241c1fc642b42
+Status: Image is up to date for seadas/find-make-matchup-harmony:latest
+docker.io/seadas/find-make-matchup-harmony:latest
+
+==> Running Harmony invoke
+WARNING:root:The SHARED_SECRET_KEY has not been set. Currently set to its default (unsecure) value.
+WARNING:root:The SHARED_SECRET_KEY has not been set. Currently set to its default (unsecure) value.
+{"message": "timing./home/harmony_service_example/__main__.py.start", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:15.576741Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "SeaBASS input: /home/testdata/seabass_files/VIIRS_2024_HPLC_NASA_R1.sb", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:15.577922Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "L2 input: /home/testdata/l2_files/AQUA_MODIS.20240520T191501.L2.SST.nc", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:15.578013Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "Output: /tmp/tmpnfb1ume1/VIIRS_2024_HPLC_NASA_R1_sst.sb.sb", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:15.578081Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "Params: {'variables': ['sst'], 'max_distance_km': 5.0, 'max_time_diff_sec': 10800.0, 'bad_flag_mask': None, 'mode': 'window'}", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:15.578151Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "Processed 1 granule(s)", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "timestamp": "2026-06-05T12:25:27.039230Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+{"message": "timing./home/harmony_service_example/__main__.py.end", "taskName": null, "user": null, "requestId": "local-make-matchup-test", "durationMs": 11464, "timestamp": "2026-06-05T12:25:27.039966Z", "level": "INFO", "application": "/home/harmony_service_example/__main__.py"}
+
+==> Output data:
+total 36
+drwxrwxr-x 2 aynur docker  4096 Jun  5 08:25 .
+drwxrwxr-x 4 aynur aynur   4096 Jun  5 08:25 ..
+-rw-r--r-- 1 root  root   27764 Jun  5 08:25 VIIRS_2024_HPLC_NASA_R1_sst.sb.sb
+
+==> Output STAC catalog + item:
+/tmp/demo-verify/metadata/message.json
+/tmp/demo-verify/metadata/f7513a66-c5d2-4b37-9aae-c01ca4b59683/f7513a66-c5d2-4b37-9aae-c01ca4b59683.json
+/tmp/demo-verify/metadata/catalog.json
+
+==> Input vs output SeaBASS /fields= diff:
+Input  (VIIRS_2024_HPLC_NASA_R1.sb):  37 fields
+Output (VIIRS_2024_HPLC_NASA_R1_sst.sb.sb): 43 fields
+
+Appended by matchup (6):
+  + matchup_min_distance_km
+  + matchup_min_dt_sec
+  + sat_sst_mean
+  + sat_sst_median
+  + sat_sst_std
+  + sat_sst_n
