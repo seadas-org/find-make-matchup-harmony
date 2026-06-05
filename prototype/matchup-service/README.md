@@ -1,8 +1,9 @@
 # Find & Make Matchup Harmony Service
 
 These instructions apply to building and developing the Find & Make Matchup
-Harmony service. The deployment path for this prototype uses Amazon ECR and the
-`find-make-matchup-harmony` image/tag pair referenced by Harmony.
+Harmony service. The deployment path for this prototype publishes the image to
+DockerHub as `seadas/find-make-matchup-harmony`; Harmony pulls that image by
+the same name when running the service.
 ## Prerequisites
 
 For building & pushing the image locally:
@@ -55,9 +56,15 @@ If you'd like the Docker image to include a local version of the Harmony Service
 
         $ make build-image LOCAL_SVCLIB_DIR=../harmony-service-lib-py
 
-2. (Optional) Deploy (publish) the Docker image to Amazon ECR:
+2. (Optional) Publish the Docker image to DockerHub
+   (`seadas/find-make-matchup-harmony`). Requires `docker login docker.io` first
+   with a user that has push rights to the `seadas/` namespace:
 
         $ make push-image
+
+   In CI this same publish is performed automatically by the
+   `Publish Image to DockerHub` GitHub Actions workflow on every push to
+   `main`; see `.github/workflows/publish-image.yml`.
 
 ### Building from Dev Container
 

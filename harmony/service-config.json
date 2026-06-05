@@ -2,8 +2,8 @@
   "serviceName": "find-make-matchup-harmony",
   "harmonyServiceImageTagName": "find-make-matchup-harmony",
   "image": {
-    "registry": "ecr",
-    "repository": "find-make-matchup-harmony",
+    "registry": "dockerhub",
+    "repository": "seadas/find-make-matchup-harmony",
     "defaultTag": "latest"
   },
   "entrypoint": "python -m harmony_service_example",
